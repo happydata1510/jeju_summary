@@ -119,6 +119,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--navy);color:var(--te
 .gl-bar{display:flex;height:7px;border-radius:3px;overflow:hidden;margin-bottom:3px;}
 .gl-labels{display:flex;justify-content:space-between;font-size:9px;color:rgba(255,255,255,.4);font-family:var(--mono);}
 
+.district-dimmed{transition:fill-opacity .4s,stroke-opacity .4s;}
 .map-tooltip{background:rgba(10,30,53,.95)!important;border:1px solid rgba(255,255,255,.15)!important;
   color:#fff!important;border-radius:6px!important;font-family:'Noto Sans KR',sans-serif!important;
   font-size:12px!important;padding:5px 10px!important;white-space:nowrap!important;}
@@ -214,6 +215,7 @@ tr:hover td{background:#f9fbf9;}
 .rt{font-family:var(--mono);text-align:right;font-weight:600;}
 .nm{font-family:var(--mono);text-align:right;}
 .bar-wrap{width:56px;}.bar-bg{width:100%;height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden;}
+.rat-cell{padding-right:14px!important;border-right:1px solid rgba(0,0,0,.07)!important;}
 .bar-fill{height:100%;border-radius:2px;}.bar-g{background:var(--pos);}.bar-r{background:var(--neg);}
 tr.selected-row td{background:#f0f7f3!important;}
 tr.selected-row .emd-nm{color:var(--green);font-weight:700;}
@@ -841,9 +843,10 @@ function toggle750m(){
 }
 
 // 스타일 — 경계 뚜렷하게
-function getStyle(feature,sel=false){
+function getStyle(feature,sel=false,dimmed=false){
   const nm=feature.properties.adm_nm||'';const d=DM[nm];const tp=d?d.tp:'동';
-  if(sel)return{fillColor:'#fbbf24',fillOpacity:.55,color:'#fbbf24',weight:3,opacity:1};
+  if(sel)return{fillColor:'#fbbf24',fillOpacity:.65,color:'#f59e0b',weight:3,opacity:1};
+  if(dimmed)return{fillColor:typeColor(tp),fillOpacity:.08,color:'rgba(30,30,60,.2)',weight:1,opacity:.4};
   return{fillColor:typeColor(tp),fillOpacity:.42,color:'rgba(30,30,60,.55)',weight:1.8,opacity:1};
 }
 
@@ -923,9 +926,25 @@ function initMap(){
 
 function selectDistrict(nm,layer,feature){
   const d=DM[nm];if(!d)return;
-  if(selectedLayer&&geoLayer)geoLayer.resetStyle(selectedLayer);
   selectedLayer=layer;selectedNm=nm;
-  if(feature&&geoLayer){layer.setStyle(getStyle(feature,true));layer.bringToFront();}
+  // 선택된 구역 강조 + 나머지 흐리게
+  if(geoLayer){
+    geoLayer.eachLayer(l=>{
+      const lnm=l.feature?.properties?.adm_nm||'';
+      if(l===layer){l.setStyle(getStyle(l.feature,true,false));l.bringToFront();}
+      else{l.setStyle(getStyle(l.feature,false,true));}
+    });
+    // 라벨 투명도 조정
+    labelMarkers.forEach(m=>{
+      const el=m.getElement();
+      if(el){el.style.opacity=m._labelNm===nm?'1':'0.18';}
+    });
+  }
+  // 선택 지역 경계 내 줌
+  try{
+    const bounds=layer.getBounds().pad(0.18);
+    map.flyToBounds(bounds,{duration:.7,easeLinearity:.4,maxZoom:13});
+  }catch(e){}
   document.getElementById('sel-none').style.display='none';
   document.getElementById('sel-info').style.display='flex';
   document.getElementById('sel-nm').innerHTML=nm+tag(d.tp);
@@ -936,8 +955,14 @@ function selectDistrict(nm,layer,feature){
   renderCurrentTab();
 }
 function clearSelection(){
-  if(selectedLayer&&geoLayer)geoLayer.resetStyle(selectedLayer);
   selectedLayer=null;selectedNm=null;
+  // 모든 레이어 원래대로 복원
+  if(geoLayer){
+    geoLayer.eachLayer(l=>{if(l.feature)l.setStyle(getStyle(l.feature,false,false));});
+    updateLabels();
+  }
+  // 제주도 전체 뷰로 복귀
+  map.flyTo([33.38,126.55],10,{duration:.7,easeLinearity:.4});
   document.getElementById('sel-none').style.display='flex';
   document.getElementById('sel-info').style.display='none';
   document.getElementById('sel-pulse').classList.remove('on');
@@ -955,7 +980,7 @@ function selectFromTable(nm){
     geoLayer.eachLayer(layer=>{
       if((layer.feature?.properties?.adm_nm||'')==nm){
         selectDistrict(nm,layer,layer.feature);
-        const c=CENTROIDS[nm];if(c)map.setView(c,12,{animate:true});
+        // selectDistrict 내에서 flyToBounds 처리
       }
     });
   }
@@ -5563,7 +5588,7 @@ function renderEdu(sub='all'){
       <td class="rnk">${i+1}</td>
       <td><div class="emd-nm" onclick="selectFromTable('${d.nm}')">${d.nm}<span class="tag ${d.tp==='읍'?'te':d.tp==='면'?'tm':'td'}">${d.tp}</span></div><div class="emd-sub">${d.rg}</div></td>
       ${sub==='all'?`<td class="nm" style="font-weight:600">${tot||0}</td>`:`<td class="nm">${pub||0}</td><td class="nm">${prv||0}</td><td class="nm" style="font-weight:600">${tot||0}</td>`}
-      <td><div style="display:flex;align-items:center;gap:5px"><span class="rt ${ratCls}" style="min-width:42px">${pct(rat)}</span>${ratBar(rat)}</div></td>
+      <td class="rat-cell"><div style="display:flex;align-items:center;gap:5px"><span class="rt ${ratCls}" style="min-width:42px">${pct(rat)}</span>${ratBar(rat)}</div></td>
       <td class="nm">${mtr(dst)}</td>
     </tr>`;
   };
@@ -5652,7 +5677,7 @@ function renderCare(sub='all'){
       <td><div class="emd-nm" onclick="selectFromTable('${d.nm}')">${d.nm}<span class="tag ${d.tp==='읍'?'te':d.tp==='면'?'tm':'td'}">${d.tp}</span></div><div class="emd-sub">${d.rg}</div></td>
       ${sub==='all'?`<td class="nm">${d.k_tot||0}</td><td class="nm">${d.c_tot||0}</td>`:`<td class="nm">${pub||0}</td><td class="nm">${prv||0}</td>`}
       <td class="nm" style="font-weight:600">${tot||0}</td>
-      <td><div style="display:flex;align-items:center;gap:5px"><span class="rt ${ratCls}" style="min-width:42px">${pct(rat)}</span>${ratBar(rat)}</div></td>
+      <td class="rat-cell"><div style="display:flex;align-items:center;gap:5px"><span class="rt ${ratCls}" style="min-width:42px">${pct(rat)}</span>${ratBar(rat)}</div></td>
       <td class="nm">${mtr(dst)}</td>
     </tr>`;
   };
