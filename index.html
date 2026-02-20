@@ -686,7 +686,13 @@ function sortData(tab,col){
 }
 function sorted(tab){
   const{col,dir}=sortState[tab];
-  return D.slice().sort((a,b)=>(a[col]<b[col]?-1:a[col]>b[col]?1:0)*dir);
+  return D.slice().sort((a,b)=>{
+    const av=a[col],bv=b[col];
+    if(av===null||av===undefined)return 1;
+    if(bv===null||bv===undefined)return -1;
+    if(typeof av==='string')return dir*(av.localeCompare(bv,'ko'));
+    return dir*(av<bv?-1:av>bv?1:0);
+  });
 }
 function thSort(tab,col,label,cls=''){
   const s=sortState[tab];
@@ -909,7 +915,7 @@ function buildGeoLayer(features){
         document.getElementById('mi-nm').textContent='—';
         document.getElementById('mi-sub').textContent='제주특별자치도 43개 읍면동';
       });
-      layer.on('click',()=>selectDistrict(nm,layer,feature));
+      layer.on('click',()=>{ if(selectedNm===nm){ clearSelection(); } else { selectDistrict(nm,layer,feature); } });
       layer.bindTooltip(`<b>${nm}</b>`,{className:'map-tooltip',sticky:true});
     }
   }).addTo(map);
@@ -1146,7 +1152,7 @@ function renderPop(){
   </div>
   <div class="twrap"><div class="thead-row"><span class="th-title">읍면동별 주민등록인구</span><span class="th-cnt">${data.length}개 지역</span></div>
   <div style="overflow-x:auto"><table><thead><tr>
-    <th class="left" style="width:26px">#</th><th class="left">읍면동</th>
+    <th class="left" style="width:26px">#</th>${thSort('pop','nm','읍면동','left')}
     ${thSort('pop','p21','2021')}${thSort('pop','p25','2025')}
     ${thSort('pop','pdiff','증감')}${thSort('pop','cagr','연평균')}
     <th>추세</th>
@@ -1182,7 +1188,7 @@ function renderBirth(){
     <span class="th-cnt" style="font-size:10px;color:var(--muted)">조출생률 = 출생수÷연앙인구×1000</span>
   </div>
   <div style="overflow-x:auto"><table><thead><tr>
-    <th class="left" style="width:26px">#</th><th class="left">읍면동</th>
+    <th class="left" style="width:26px">#</th>${thSort('birth','nm','읍면동','left')}
     ${thSort('birth','b21','출생 \'21')}${thSort('birth','b25','출생 \'25')}
     ${thSort('birth','cbr21','CBR \'21 (‰)')}${thSort('birth','cbr25','CBR \'25 (‰)')}
     ${thSort('birth','cbr25','+/- ‰p')}
@@ -1215,7 +1221,7 @@ function renderMig(){
   </div>
   <div class="twrap"><div class="thead-row"><span class="th-title">읍면동별 순이동인구</span><span class="th-cnt">${data.length}개</span></div>
   <div style="overflow-x:auto"><table><thead><tr>
-    <th class="left" style="width:26px">#</th><th class="left">읍면동</th>
+    <th class="left" style="width:26px">#</th>${thSort('mig','nm','읍면동','left')}
     ${thSort('mig','ji24','전입(24)')}${thSort('mig','jo24','전출(24)')}
     ${thSort('mig','n24','순이동(24)')}${thSort('mig','nmr24','순이동률(‰)')}
     ${thSort('mig','n21','순이동(21)')}
@@ -1247,7 +1253,7 @@ function renderFg(){
   </div>
   <div class="twrap"><div class="thead-row"><span class="th-title">읍면동별 등록외국인</span><span class="th-cnt">${data.length}개</span></div>
   <div style="overflow-x:auto"><table><thead><tr>
-    <th class="left" style="width:26px">#</th><th class="left">읍면동</th>
+    <th class="left" style="width:26px">#</th>${thSort('fg','nm','읍면동','left')}
     ${thSort('fg','f20','\'20')}${thSort('fg','f22','\'22')}
     ${thSort('fg','f24','\'24')}
     ${thSort('fg','fdiff','5년 증감')}${thSort('fg','frate5','5년 증감률')}${thSort('fg','frate1y','전년 대비')}
@@ -1284,7 +1290,7 @@ function renderAge(){
   </div>
   <div class="twrap"><div class="thead-row"><span class="th-title">읍면동별 연령별 인구구조 (2025)</span><span class="th-cnt">${data.length}개 지역 · 비율(%)</span></div>
   <div style="overflow-x:auto"><table><thead><tr>
-    <th class="left" style="width:26px">#</th><th class="left">읍면동</th>
+    <th class="left" style="width:26px">#</th>${thSort('age','nm','읍면동','left')}
     ${thSort('age','유아율25','유아%')}${thSort('age','유소율25','유소년%')}
     ${thSort('age','청년율25','청년%')}${thSort('age','생산율25','생산가능%')}
     ${thSort('age','노인율25','고령%')}
@@ -1318,7 +1324,7 @@ function renderBiz(){
   </div>
   <div class="twrap"><div class="thead-row"><span class="th-title">읍면동별 산업·사업체</span><span class="th-cnt">${data.length}개</span></div>
   <div style="overflow-x:auto"><table><thead><tr>
-    <th class="left" style="width:26px">#</th><th class="left">읍면동</th>
+    <th class="left" style="width:26px">#</th>${thSort('biz','nm','읍면동','left')}
     ${thSort('biz','biz21','사업체\'21')}${thSort('biz','biz23','사업체\'23')}
     ${thSort('biz','biz_cagr','증감률')}
     ${thSort('biz','emp23','종사자\'23')}
@@ -5089,7 +5095,10 @@ function sortedEdu(tab){
   const{col,dir}=sortEdu[tab];
   const arr=selectedNm?[EDU_M[selectedNm]].filter(Boolean):EDU_R.map(r=>EDU_M[r[0]]);
   return arr.slice().sort((a,b)=>{
-    const av=a[col]??-Infinity,bv=b[col]??-Infinity;
+    const av=a[col],bv=b[col];
+    if(av===null||av===undefined)return 1;
+    if(bv===null||bv===undefined)return -1;
+    if(typeof av==='string')return dir*(av.localeCompare(bv,'ko'));
     return dir*(bv-av);
   });
 }
@@ -5609,7 +5618,7 @@ function renderEdu(sub='all'){
     <div class="thead-row"><span class="th-title">📚 ${cfg.label} 현황 · 인구비율 · 접근거리</span><span class="th-cnt" style="font-size:9px;color:#888">인구비율: 750m 반경 내 인구격자 비율 | 접근거리: 격자 중심 인구가중 1인당 접근거리</span></div>
     <div style="overflow-x:auto"><table><thead><tr>
       <th class="left" style="width:26px">#</th>
-      <th class="left">읍면동</th>
+      ${thEdu('edu','nm','읍면동','left')}
       ${sub==='all'?'<th>학교합계</th>':'<th>국공립</th><th>사립</th><th>합계</th>'}
       ${thEdu('edu','s_rat','인구비율(%)')}
       ${thEdu('edu','s_dst','접근거리(m)')}
@@ -5709,7 +5718,7 @@ function renderCare(sub='all'){
   ${sub==='all'?`<div class="twrap" style="margin-top:10px">
     <div class="thead-row"><span class="th-title">기관별 세부 현황</span></div>
     <div style="overflow-x:auto"><table><thead><tr>
-      <th class="left" style="width:26px">#</th><th class="left">읍면동</th>
+      <th class="left" style="width:26px">#</th>${thEdu('care','nm','읍면동','left')}
       <th>유치원_국공립</th><th>유치원_사립</th>${thEdu('care','k_rat','유치원_인구비율')}${thEdu('care','k_dst','유치원_접근거리')}
       <th>어린이집_국공립</th><th>어린이집_민간</th>${thEdu('care','c_rat','어린이집_인구비율')}${thEdu('care','c_dst','어린이집_접근거리')}
     </tr></thead><tbody>
